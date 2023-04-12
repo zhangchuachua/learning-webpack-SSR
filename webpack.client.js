@@ -2,6 +2,7 @@ const path = require('path');
 const htmlWebpackPlugin = require('html-webpack-plugin');
 
 module.exports = {
+  mode: 'development',
   entry: './src/client/index.js',
   output: {
     filename: "bundle.client.js",
@@ -35,5 +36,15 @@ module.exports = {
       }
     ]
   },
-  devtool: 'source-map'
+  devtool: 'source-map',
+  devServer: {
+    // 服务暴露的文件夹
+    static: './dist',
+    // 是否启用压缩
+    compress: true,
+    // 端口
+    port: 8091,
+    // 开启热更新, 在 webpack-dev-server v4 后默认开启
+    hot: true
+  }
 }

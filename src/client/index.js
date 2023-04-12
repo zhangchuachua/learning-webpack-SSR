@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 
 export function App() {
+  const handleClick = useCallback(() => {
+    console.log('button1')
+  }, []);
+
   return <div>
     <p>this is App</p>
-    <button onClick={() => {
-      console.log('app button')
-    }}>
+    <button onClick={handleClick}>
       click
     </button>
   </div>
