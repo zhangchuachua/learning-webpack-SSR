@@ -4,9 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "npm-run-all -p dev:server dev:client",
-    "dev:server": "webpack --mode development --config webpack.server.js",
-    "dev:client": "webpack --mode development --config webpack.client.js",
+    "dev": "npm-run-all -p dev:server dev:client nodemon",
+    "nodemon": "nodemon --watch dist -x node ./dist/server/bundle.server.js",
+    "dev:server": "webpack --mode development --config webpack.server.js --watch",
+    "dev:client": "webpack --mode development --config webpack.client.js --watch",
     "dev:react": "webpack serve --mode development -c webpack.client.js"
   },
   "keywords": [],
@@ -16,6 +17,7 @@
     "@koa/cors": "^4.0.0",
     "@koa/router": "^12.0.0",
     "koa": "^2.14.1",
+    "koa-send": "^5.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "webpack-dev-server": "^4.13.2"

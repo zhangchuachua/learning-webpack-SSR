@@ -128,7 +128,7 @@ module.exports = {
     ]
   },
   // !重点在这一块，因为 node 代码在服务器端，所以 node_modules 内的代码是不需要被打包的，是可以直接引用的，所以就可以使用 nodeExternals 忽略 node_modules 中的依赖，不打包这些内容；
-  externals: [nodeExternals()],
+externals: [nodeExternals()],
   externalsPresets: {
     node: true// !忽略 node 的内置模块，比如 fs path 等模块不会打包
   },
@@ -158,4 +158,26 @@ module.exports = api => {
     ]
   }
 }
+```
+
+## 如何使用 koa-send 暴露静态资源
+
+koa-send 其实只用于发送服务器资源，但是我们可以封装为暴露静态资源文件夹
+
+参考了 [koa-static](https://github.com/koajs/static/blob/master/index.js) 的代码
+
+```js
+// 暴露静态文件夹
+.use(async (ctx, next) => {
+  // *先进入 next 让其他的进行处理；这样可以避免所有的请求都被当作是访问静态资源，比如说请求 /ssr 被误以为是访问 ssr 文件夹
+  await next();
+  // *当被其他处理完成后，再进行过滤
+  if (ctx.method !== 'HEAD' && ctx.method !== 'GET') return;
+  // *static 开头的就表示在访问静态资源
+  if (!ctx.path.startsWith('/static')) return;
+  // *这里使用 __dirname, __filename 时要注意：__dirname, __filename 因为这个项目是使用 webpack 打包的，所以最后的 __dirname, __filename 应该是打包后的文件对应的路径
+  // *所以我在这里使用了 resolve('.', 'dist/client'); '.' 在 resolve 中就表示根目录；
+  // *这里的 ctx.path.replace('/static', '') 不是很严谨
+  await send(ctx, ctx.path.replace('/static', ''), { root: path.resolve('.', 'dist/client') })
+})
 ```
