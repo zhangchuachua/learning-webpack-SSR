@@ -1,11 +1,12 @@
+import React from 'react';
 import Router from "@koa/router";
-import { App } from "../client";
+import App from "../client/components/App";
 import { renderToString } from "react-dom/server";
 
 const router = new Router();
 
 router.get('/', ctx => {
-  const html = renderToString(App);
+  const html = renderToString(<App />);
   ctx.body = `
     <!DOCTYPE html>
     <html lang="en">
@@ -19,4 +20,4 @@ router.get('/', ctx => {
   `
 })
 
-module.exports = router;
+export default router;

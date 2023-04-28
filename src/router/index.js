@@ -5,4 +5,4 @@ const router = new Router();
 
 router.use('/ssr', ssrRouter.routes())
 
-module.exports = router;
+export default router;

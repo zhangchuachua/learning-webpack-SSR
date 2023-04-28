@@ -1,18 +1,6 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import ReactDOM from 'react-dom/client';
-
-export function App() {
-  const handleClick = useCallback(() => {
-    console.log('button1')
-  }, []);
-
-  return <div>
-    <p>this is App</p>
-    <button onClick={handleClick}>
-      click
-    </button>
-  </div>
-}
+import App from "./components/App";
 
 const root = ReactDOM.createRoot(document.getElementById('app'));
 root.render(<App/>)
