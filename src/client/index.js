@@ -1,6 +1,6 @@
 import React from 'react';
-import ReactDOM from 'react-dom/client';
+import { hydrateRoot } from 'react-dom/client';
 import App from "./components/App";
+import './static/uno.css'
 
-const root = ReactDOM.createRoot(document.getElementById('app'));
-root.render(<App/>)
+const root = hydrateRoot(document.getElementById('app'), <App/>);

@@ -9,7 +9,6 @@ const app = new koa({ proxy: true });
 app
   .use(cors({
     origin: '*'
-
   }))
   // 暴露静态文件夹
   .use(async (ctx, next) => {

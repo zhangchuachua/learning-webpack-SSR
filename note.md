@@ -180,4 +180,133 @@ koa-send 其实只用于发送服务器资源，但是我们可以封装为暴�
   // *这里的 ctx.path.replace('/static', '') 不是很严谨
   await send(ctx, ctx.path.replace('/static', ''), { root: path.resolve('.', 'dist/client') })
 })
+
+// *注意在这样设置后，暴露出去的资源就是以 /static 开头了，所以需要修改 htmlWebpackPlugin 插件的配置，使其插入的 js 文件的路径添加 /static，配置项为： 
+// *  plugins: [new htmlWebpackPlugin({ template: "./src/client/index.html", inject: 'body', publicPath: '/static' })],
+```
+
+## SSR 中处理各种文件
+
+### 处理 html
+
+在解决了 [使用 node 实现 SSR 时提示 "React is not defined"](#使用-node-实现-ssr-时提示-react-is-not-defined-的问题) 与 [如何使用 koa-send 暴露静态资源](#如何使用-koa-send-暴露静态资源) 两个问题后，已经可以实现最简单的手动拼接 SSR 了
+
+```js
+router.get('/', async ctx => {
+  const content = renderToString(<App/>);
+  ctx.body = `
+    <html>
+      <head>...</head>
+      <body>
+        <div id='app'>${content}</div>
+        <script src='/static/bundle.client.js'></script>
+      </body>
+    </html>
+  `;
+})
+```
+
+但是这样肯定不能满足需求的。需要进行修改
+
+1. 在 [如何构建 react 应用](#如何构建-react-应用) 中，使用了 htmlWebpackPlugin 插件，以 client/index.html 为模板，生产新的 html 并自动插入 js 文件；我们应当使用这个生产的 html 进行拼接；
+2. 同样的构建 react 应用时，使用的还是 createRoot ，使用 SSR 应该使用 hydrateRoot
+
+（我的预想是，不进行拼接 HTML，而是调用一个 API 就自动生成完整的 html 直接进行发送就行；但是好像不太现实，还是的手动拼接 html 再进行发送）
+
+修改结果：
+
+```js
+const htmlPath = path.resolve(process.cwd(), 'dist/client/index.html');
+const match = '<% template %/>';
+
+router.get('/', async ctx => {
+  // 这样仅仅是把 html 渲染出来了，但是事件啊，其他的 js 啊 统统是没有的，所以还需要加上编译后的 js；
+  // *这也是为什么要使用一个 client 一个 server；
+  const content = renderToString(<App/>);
+  const html = fs.readFileSync(htmlPath, { encoding: 'utf-8' });
+  ctx.body = html.replace(match, content);
+})
+```
+
+### 处理 css
+
+为了方便，在这个项目中引入了 UnoCss, 大概的步骤如下：
+
+1. `ni unocss -D` 安装 unocss
+2. 创建 `unocss.config.mjs` 对 unocss 进行配置
+3. 为了方便，没有使用 `@unocss/webpack` 而是在 package.json 中创建一个 scripts `"dev:unocss": "unocss "./src/client/**/*.jsx" --watch -c uno.config.mjs -o ./src/client/static/uno.css"` 规定监听和输出；并且需要在 dev 时同样运行该命令
+4. 在 react 处引入 `import '../static/uno.css'`;
+
+UnoCss 完成，那么就需要配置 webpack，因为 webpack 不支持 css 文件；
+
+首先，安装 `ni css-loader style-loader -D`;
+
+然后修改 webpack.client.js, 在 module.rules 中添加 
+
+```
+  {
+    test: /\.css$/,
+    exclude: /node_module/,
+    use: ['style-loader', 'css-loader']
+  }
+```
+
+启动项目，发现可以正常展示；但是 css-loader 是读取 css 文件中的字符串，然后 style-loader 在客户端通过 js 创建 style-loader 再将 字符串填充进去；这样来加载 css 文件的
+
+要想使用 link 标签来加载 css，可以搭配使用 HtmlWebpackPlugin 与 MiniCssExtractPlugin 插件；
+
+1. MiniCssExtractPlugin 负责将 css 提取为文件；
+2. HtmlWebpackPlugin 负责将提取出来的文件以 link 标签的方式插入 html 中；
+
+这两个插件之间应该有联动，具体的源码不清楚，但是只需要 MiniCssExtractPlugin 提取出来 css HtmlWebpackPlugin 就会自动创建对应的 link 标签；并且 href 都是在 HtmlWebpackPlugin 定义的；
+
+#### 处理 css-module
+
+css-module 需要修改 [css-loader](https://webpack.docschina.org/loaders/css-loader/) 的配置：
+
+```js
+const cssLoader = {
+  loader: 'css-loader',
+  options: {
+    moduels: {
+      mode: 'lcoal',
+      // *仅匹配 .modules. | .icss. 文件
+      auto: true,
+    }
+  }
+}
+```
+
+配置 css-module 时遇到了一个问题；开始认为服务器端不需要 css 文件，于是就在 `webpack.server.js` 中去掉了 `MiniCssExtractPlugin` 结果发现，在服务器端 css-module 并没有起作用，css 类名并没有被编译；
+
+最后查看了 client 的输出产物才发现，代码中已经说明了，css-loader 将 class 名编译后传递给了 MiniCssExtractPlugin.loader 然后由该插件，抽离出 css 文件并且将编译后的名字写入到最终生成物中去；
+
+```js
+// extracted by mini-css-extract-plugin
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = ({"hello-world":"NnFbxMNCXne_KjgU_O6x"});
+```
+
+于是在服务器端也添加了该插件，发现服务器端可以正常获得 css-module 编译后的类名了； 但是这样也是有问题的，将会在服务器端也生成一个 css 文件；这是不需要的；
+
+通过查阅资料，发现还可以使用 `isomorphic-style-loader` 但是看了一下文档；感觉目前不是很符合需求；可以等后期再来看看；
+
+TODO: 完善 SSR 服务器端对 css 的处理；
+
+#### 处理 sass
+
+只需要添加 `sass sass-loader` 即可
+
+#### 使用 autoprefixer
+
+1. 添加 `postcss postcss-loader autoperfixer`
+2. 在 webpack config 中 添加 postcss-loader
+3. 添加 postcss.config.js 文件
+
+```js
+// postcss.config.js
+module.exports = {
+  plugins: [
+    require('autoprefixer'),
+  ]
+}
 ```
