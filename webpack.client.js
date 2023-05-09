@@ -18,7 +18,6 @@ const config = merge(baseConfig, {
   },
   plugins: [new htmlWebpackPlugin({
     template: "./src/client/index.html",
-    inject: 'body',
     publicPath: '/static'
   })],
   module: {
